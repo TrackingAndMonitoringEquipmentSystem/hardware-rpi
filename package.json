@@ -88,11 +88,5 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
-  },
-  "opencv4nodejs": {
-    "disableAutoBuild": 1,
-    "opencvIncludeDir": "/usr/local/include/opencv4",
-    "opencvLibDir": "/usr/local/lib",
-    "opencvBinDir": "/usr/local/bin"
   }
 }

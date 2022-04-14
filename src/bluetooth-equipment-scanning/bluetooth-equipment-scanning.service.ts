@@ -6,7 +6,7 @@ export class BluetoothEquipmentScanningService {
   private resolveScanFunction: (result: Record<string, any>) => void;
   private bufferList: string[] = [];
   constructor() {
-    this.channel = can.createRawChannel('vcan0', true);
+    this.channel = can.createRawChannel(process.env.CAN_INTERFACE, true);
     this.channel.addListener('onMessage', this.messageHandler.bind(this));
     this.channel.start();
   }
