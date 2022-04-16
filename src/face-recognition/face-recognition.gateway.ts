@@ -3,6 +3,7 @@ import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessa
 import { StreamAndRecordVideoService } from 'src/stream-and-record-video/stream-and-record-video.service';
 import { FaceRecognitionService } from './face-recognition.service';
 import { Server } from 'socket.io';
+import axios from 'axios';
 
 @WebSocketGateway({ cors: true })
 export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
@@ -20,7 +21,7 @@ export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnectio
   afterInit(server: any) {
     this.logger.log('initialized');
   }
- 
+
   handleConnection(client: any, ...args: any[]) {
     this.logger.log(`client: ${client.id} is connected`);
   }
@@ -31,7 +32,7 @@ export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnectio
 
   @SubscribeMessage('startFaceRecognition')
   onStartFaceRecognition(): void {
-    if(!this.isRunning){
+    if (!this.isRunning) {
       this.logger.log(`start face recognition`);
       this.emitFaceRecognitionResult();
       this.isRunning = true;
@@ -43,18 +44,23 @@ export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnectio
   async emitFaceRecognitionResult(): Promise<void> {
     const result = await this.faceRecognitionService.detectFace();
     this.server.emit('faceRecognitionResult', result)
-    if(result.isDetectedFace){
+    if (result.isDetectedFace) {
       this.onStopFaceRecognition();
+      const faceRecogResult = await axios.post(`${process.env.BACKEND_URL}/${process.env.FACE_RECOGNITION_PATH}/${process.env.FACE_RECOGNITION_PATH_VALIDATE_FACE_ID}`,
+        {
+          base64File: result.rawBase64,
+        });
+      console.log('->faceRecogResult.data:', faceRecogResult.data);
     }
-    if(this.isRunning) {
-      this.intervalHandler = setTimeout(this.emitFaceRecognitionResult.bind(this),1000 / Number(process.env.FACE_RECOG_FPS));
+    if (this.isRunning) {
+      this.intervalHandler = setTimeout(this.emitFaceRecognitionResult.bind(this), 1000 / Number(process.env.FACE_RECOG_FPS));
     }
   }
 
   @SubscribeMessage('stopFaceRecognition')
   onStopFaceRecognition(): void {
     this.isRunning = false;
-    if(this.intervalHandler){
+    if (this.intervalHandler) {
       clearTimeout(this.intervalHandler);
     }
     this.streamAndRecordVideoService.releaseCamera(0);

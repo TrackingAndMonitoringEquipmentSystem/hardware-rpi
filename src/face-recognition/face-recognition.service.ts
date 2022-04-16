@@ -7,8 +7,8 @@ import * as canvas from "canvas";
 @Injectable()
 export class FaceRecognitionService {
     constructor(
-        private streamAndRecordVideoService :StreamAndRecordVideoService,
-    ){
+        private streamAndRecordVideoService: StreamAndRecordVideoService,
+    ) {
         this.initialFaceApi();
     }
     async initialFaceApi(): Promise<void> {
@@ -25,19 +25,19 @@ export class FaceRecognitionService {
 
     async detectFace(): Promise<Record<string, unknown>> {
         const rawFrameImage = await this.streamAndRecordVideoService.getFrameImage(0)
-        const image =  this.parseImage(rawFrameImage); 
+        const image = this.parseImage(rawFrameImage);
         const result = await faceapi.detectSingleFace(image as faceapi.TNetInput, new faceapi.SsdMobilenetv1Options({
             minConfidence: 0.5,
         }));
-        if(result){
+        if (result) {
             const canvasImg = await canvas.loadImage(rawFrameImage);
             const out = await faceapi.createCanvasFromMedia(canvasImg);
             faceapi.draw.drawDetections(out, result);
-            return {isDetectedFace: true, image: out.toBuffer("image/jpeg").toString('base64')};
+            return { isDetectedFace: true, image: out.toBuffer("image/jpeg").toString('base64'), rawBase64: rawFrameImage.toString('base64') };
         } else {
-            return {isDetectedFace: false, image: rawFrameImage.toString('base64')};
+            return { isDetectedFace: false, image: rawFrameImage.toString('base64') };
         }
-        
+
     }
 
     parseImage(file: Uint8Array): unknown {

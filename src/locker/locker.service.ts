@@ -22,6 +22,7 @@ export class LockerService {
                 await this.lockerRepository.save(this.lockerRepository.create({
                     id: preRegistedLocker.data.data.locker_id,
                     status: preRegistedLocker.data.data.status,
+                    totalEquipment: 0,
                 }));
             } catch (error) {
                 this.logger.error(error);
