@@ -8,8 +8,6 @@ import { LockerGateway } from 'src/locker/locker.gateway';
   providers: [
     StreamAndRecordVideoGateway,
     StreamAndRecordVideoService,
-    LockerGateway,
-    LockerService,
   ],
 })
 export class StreamAndRecordVideoModule {}
