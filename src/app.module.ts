@@ -30,4 +30,4 @@ import { LockerModule } from './locker/locker.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

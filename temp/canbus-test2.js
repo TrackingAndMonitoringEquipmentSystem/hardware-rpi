@@ -1,5 +1,5 @@
 var can = require('socketcan');
-const ID = 1;
+const ID = 2;
 var channel = can.createRawChannel('vcan0', true);
 channel.addListener('onMessage', messageHandler);
 channel.start();
@@ -10,7 +10,7 @@ function messageHandler(message){
     channel.send({
       id: 0,
       ext: true,
-      data: Buffer.from('1234', 'ascii'),
+      data: Buffer.from('4567', 'ascii'),
     });
     channel.send({
       id: 0,

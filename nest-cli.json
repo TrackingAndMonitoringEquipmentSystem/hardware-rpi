@@ -3,7 +3,8 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "assets": [
-        "face-recognition/models/**/*"
+        "face-recognition/models/**/*",
+        "locker/images/**/*"
     ]
   }
 }
