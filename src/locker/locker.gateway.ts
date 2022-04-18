@@ -11,6 +11,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as io from 'socket.io-client';
 import { Socket } from 'socket.io-client';
 import { Locker } from 'src/entities/locker.entity';
+import { BluetoothEquipmentScanningService } from 'src/bluetooth-equipment-scanning/bluetooth-equipment-scanning.service';
 @WebSocketGateway({ cors: true })
 @Injectable()
 export class LockerGateway
@@ -19,7 +20,10 @@ export class LockerGateway
   @WebSocketServer()
   server: Server;
   private socket: Socket;
-  constructor(private readonly lockerService: LockerService) {
+  private locker: Locker;
+  constructor(private readonly lockerService: LockerService, 
+    private readonly bluetoothEquipmentScanningService: BluetoothEquipmentScanningService,
+    ) {
     this.socket = io(
       `${process.env.SOCKET_IO_HOST}:${process.env.SOCKET_IO_PORT}/${process.env.SOCKET_IO_LOCKER_NAME_SPACE}`,
     );
@@ -55,19 +59,32 @@ export class LockerGateway
   }
 
   async subscribeToEvents(socket: Socket): Promise<void> {
-    const locker = await this.lockerService.getLocker();
-    socket.on(`locker/${locker.id}`, this.onLockerUpdate.bind(this));
+    this.locker = await this.lockerService.getLocker();
+    socket.on(`locker/${this.locker.id}`, this.onLockerCommand.bind(this));
   }
 
-  async onLockerUpdate(data: any) {
-    console.log('->updated locker:', data);
-    const locker = await this.lockerService.updateLocker({
-      id: data.locker_id,
-      location: `ห้อง ${data.room.name} ชั้น ${data.room.floor.name} อาคาร ${data.room.floor.building.name}`,
-      name: data.locker_name,
-      description: data.description,
-      status: data.status,
-    } as Locker);
-    this.server.emit('locker_updated', locker);
+  async onLockerCommand(data: any) {
+    console.log('->onLockerCommand:', data);
+    if(data.command == 'lockerUpdate'){
+      const updatedLocker = data.data;
+      const locker = await this.lockerService.updateLocker({
+        id: updatedLocker.locker_id,
+        location: `ห้อง ${updatedLocker.room.name} ชั้น ${updatedLocker.room.floor.name} อาคาร ${updatedLocker.room.floor.building.name}`,
+        name: updatedLocker.locker_name,
+        description: updatedLocker.description,
+        status: updatedLocker.status,
+      } as Locker);
+      this.server.emit('locker_updated', locker);
+    } else if(data.command == 'addEquipment') {
+      try{
+        const results = await this.bluetoothEquipmentScanningService.scan();
+        this.socket.emit(`locker/addEquipment/response`,{id: this.locker.id, data:results});
+      }catch(error) {
+        console.error(error);
+      }
+      
+      
+    }
+    
   }
 }

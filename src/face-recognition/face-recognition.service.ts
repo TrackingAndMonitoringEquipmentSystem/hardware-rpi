@@ -15,7 +15,7 @@ export class FaceRecognitionService {
     }
 
     async detectFace(): Promise<Record<string, unknown>> {
-        const rawFrameImage = await this.streamAndRecordVideoService.getFrameImage(0)
+        const rawFrameImage = await this.streamAndRecordVideoService.getFrameImage(1)
         const { objects, numDetections } = this.face_cascade.detectMultiScale(rawFrameImage.bgrToGray(), 1.1, 4);
 
         if (numDetections.length == 1) {

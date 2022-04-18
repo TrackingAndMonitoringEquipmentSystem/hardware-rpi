@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as can from 'socketcan';
+
 @Injectable()
 export class BluetoothEquipmentScanningService {
   private channel: any;
@@ -23,7 +24,6 @@ export class BluetoothEquipmentScanningService {
           this.resolveScanFunction({ successful: true, data: [...new Set(this.bufferList)] });
           this.finishedCount = 0;
         }
-
       } else {
         this.bufferList.push(frame.data.toString('hex'));
       }
@@ -32,22 +32,23 @@ export class BluetoothEquipmentScanningService {
 
   async scan(): Promise<string[]> {
     this.bufferList = [];
-    for (let i = 1; i <= this.totalCanNode; i++) {
-      this.channel.send({
-        id: i,
-        data: Buffer.from('scan'),
-      });
-    }
-
-    const result: any = await new Promise((resolve, reject) => {
+   
+    const result: any = await new Promise(((resolve, reject) => { 
       this.resolveScanFunction = resolve;
+      for (let i = 1; i <= this.totalCanNode ; i++) {
+        this.channel.send({
+          id: i,
+          data: Buffer.from('scan'),
+          ext: true,
+        });
+      }
       setTimeout(() => {
         reject({
           successful: false,
           message: 'SCAN TIMEOUT',
         });
       }, 20000);
-    });
+    }).bind(this));
     if (result.successful) {
       return result.data;
     } else {

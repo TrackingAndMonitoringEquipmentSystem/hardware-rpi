@@ -4,6 +4,7 @@ import { BluetoothEquipmentScanningService } from './bluetooth-equipment-scannin
 
 @Module({
   controllers: [BluetoothEquipmentScanningController],
-  providers: [BluetoothEquipmentScanningService]
+  providers: [BluetoothEquipmentScanningService],
+  exports:[BluetoothEquipmentScanningService],
 })
 export class BluetoothEquipmentScanningModule {}

@@ -63,6 +63,6 @@ export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnectio
     if (this.intervalHandler) {
       clearTimeout(this.intervalHandler);
     }
-    this.streamAndRecordVideoService.releaseCamera(0);
+    this.streamAndRecordVideoService.releaseCamera(2);
   }
 }
