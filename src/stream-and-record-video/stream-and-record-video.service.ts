@@ -8,11 +8,11 @@ export class StreamAndRecordVideoService {
     this.cameraMap = process.env.CAMERA_MAP.split(',');
   }
 
-  getFrame(camera: number): string {
+  async getFrame(camera: number): Promise<string> {
     if (!this.captures[camera]) {
       this.captures[camera] = new cv.VideoCapture(this.cameraMap[camera]);
     }
-    const frame = this.captures[camera].read();
+    const frame = await this.captures[camera].readAsync();
     const image = cv.imencode('.jpg', frame).toString('base64');
     return image;
   }
@@ -23,6 +23,11 @@ export class StreamAndRecordVideoService {
     }
     const frame = await this.captures[camera].readAsync();
 
+    return frame;
+  }
+
+  async get300x300FrameImage(camera: number): Promise<cv.Mat> {
+    const frame = await this.getFrameImage(camera);
     return frame;
   }
 

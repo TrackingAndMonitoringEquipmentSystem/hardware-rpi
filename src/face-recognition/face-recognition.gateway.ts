@@ -4,6 +4,7 @@ import { StreamAndRecordVideoService } from 'src/stream-and-record-video/stream-
 import { FaceRecognitionService } from './face-recognition.service';
 import { Server } from 'socket.io';
 import axios from 'axios';
+import { LockerService } from 'src/locker/locker.service';
 
 @WebSocketGateway({ cors: true })
 export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
@@ -15,6 +16,7 @@ export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnectio
   constructor(
     private readonly faceRecognitionService: FaceRecognitionService,
     private streamAndRecordVideoService: StreamAndRecordVideoService,
+    private lockerService: LockerService,
   ) {
 
   }
@@ -49,8 +51,10 @@ export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnectio
       const faceRecogResult = await axios.post(`${process.env.BACKEND_URL}/${process.env.FACE_RECOGNITION_PATH}/${process.env.FACE_RECOGNITION_PATH_VALIDATE_FACE_ID}`,
         {
           base64File: result.rawBase64,
+          lockerId: (await (this.lockerService.getLocker())).id,
         });
       console.log('->faceRecogResult.data:', faceRecogResult.data);
+      this.server.emit('faceRecognitionResult', faceRecogResult.data)
     }
     if (this.isRunning) {
       this.intervalHandler = setTimeout(this.emitFaceRecognitionResult.bind(this), 1000 / Number(process.env.FACE_RECOG_FPS));
@@ -63,6 +67,6 @@ export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnectio
     if (this.intervalHandler) {
       clearTimeout(this.intervalHandler);
     }
-    this.streamAndRecordVideoService.releaseCamera(2);
+    this.streamAndRecordVideoService.releaseCamera(Number(process.env.FACE_RECOG_CAM));
   }
 }

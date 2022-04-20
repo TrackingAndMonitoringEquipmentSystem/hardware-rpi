@@ -3,15 +3,27 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Locker } from 'src/entities/locker.entity';
 import { Repository } from 'typeorm/repository/Repository';
 import axios from 'axios';
+import {BinaryValue, Gpio} from 'onoff';
 @Injectable()
 export class LockerService {
-
     private logger = new Logger('LockerService');
+    private ledLight1 = new Gpio(Number(process.env.LED_LIGHT_1), 'out', null, {activeLow: true});
+    private ledLight2 = new Gpio(Number(process.env.LED_LIGHT_2), 'out', null, {activeLow: true});
+    private ledLight3 = new Gpio(Number(process.env.LED_LIGHT_3), 'out', null, {activeLow: true});
+    private ledLight4 = new Gpio(Number(process.env.LED_LIGHT_4), 'out', null, {activeLow: true});
     constructor(
         @InjectRepository(Locker)
         private lockerRepository: Repository<Locker>
     ) {
+        this.initialGpio();
         this.initialLocker();
+    }
+
+    async initialGpio(): Promise<any>{
+        await this.ledLight1.write(0);
+        await this.ledLight2.write(0);
+        await this.ledLight3.write(0);
+        await this.ledLight4.write(0);
     }
 
     async initialLocker(): Promise<void> {
@@ -39,5 +51,12 @@ export class LockerService {
 
     async updateLocker(locker: Locker): Promise<Locker> {
         return await this.lockerRepository.save(locker);
+    }
+
+    async setAllLightStatus(status: BinaryValue): Promise<any>{
+        await this.ledLight1.write(status);
+        await this.ledLight2.write(status);
+        await this.ledLight3.write(status);
+        await this.ledLight4.write(status);
     }
 }

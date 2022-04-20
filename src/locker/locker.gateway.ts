@@ -12,6 +12,9 @@ import * as io from 'socket.io-client';
 import { Socket } from 'socket.io-client';
 import { Locker } from 'src/entities/locker.entity';
 import { BluetoothEquipmentScanningService } from 'src/bluetooth-equipment-scanning/bluetooth-equipment-scanning.service';
+import { v4 as uuidv4 } from 'uuid';
+import axios from 'axios';
+import { StreamAndRecordVideoService } from 'src/stream-and-record-video/stream-and-record-video.service';
 @WebSocketGateway({ cors: true })
 @Injectable()
 export class LockerGateway
@@ -23,6 +26,7 @@ export class LockerGateway
   private locker: Locker;
   constructor(private readonly lockerService: LockerService, 
     private readonly bluetoothEquipmentScanningService: BluetoothEquipmentScanningService,
+    private readonly streamAndRecordVideoService: StreamAndRecordVideoService,
     ) {
     this.socket = io(
       `${process.env.SOCKET_IO_HOST}:${process.env.SOCKET_IO_PORT}/${process.env.SOCKET_IO_LOCKER_NAME_SPACE}`,
@@ -77,14 +81,34 @@ export class LockerGateway
       this.server.emit('locker_updated', locker);
     } else if(data.command == 'addEquipment') {
       try{
-        const results = await this.bluetoothEquipmentScanningService.scan();
-        this.socket.emit(`locker/addEquipment/response`,{id: this.locker.id, data:results});
+        const scanPromise = this.bluetoothEquipmentScanningService.scan();
+        const objectDetectPromise = this.detectObject();
+        const promiseResults = await Promise.all([scanPromise,objectDetectPromise]);
+        console.log('->promiseResults.data:', promiseResults[1]);
+        this.socket.emit(`locker/addEquipment/response`,{id: this.locker.id, data:promiseResults[0]});
+
       }catch(error) {
-        console.error(error);
+        console.error('Error:', error);
       }
-      
-      
     }
     
+  }
+
+  async detectObject(): Promise<any>{
+    const objectDetectCameraMap = [0];
+    const detectResults = [];
+    await this.lockerService.setAllLightStatus(1);
+    for(const cameraNo of objectDetectCameraMap) {
+      const frame = await this.streamAndRecordVideoService.getFrame(cameraNo);
+     const detectResult = await axios.post(`${process.env.OBJECT_DETECTION_URL}:${process.env.OBJECT_DETECTION_PORT}/${process.env.OBJECT_DETECTION_DETECT_PATH}`,
+          {
+            uuid: uuidv4(),
+            image: frame,
+          }
+        );
+    detectResults.push(detectResult);
+    }
+    await this.lockerService.setAllLightStatus(0);
+    return detectResults;
   }
 }

@@ -15,21 +15,21 @@ export class FaceRecognitionService {
     }
 
     async detectFace(): Promise<Record<string, unknown>> {
-        const rawFrameImage = await this.streamAndRecordVideoService.getFrameImage(1)
+        const rawFrameImage = await this.streamAndRecordVideoService.getFrameImage(Number(process.env.FACE_RECOG_CAM))
         const { objects, numDetections } = this.face_cascade.detectMultiScale(rawFrameImage.bgrToGray(), 1.1, 4);
 
         if (numDetections.length == 1) {
             cv.drawDetection(rawFrameImage, objects[0]);
-            const outputImage = cv.imencode('.jpg', rawFrameImage);
-            return { isDetectedFace: true, image: outputImage.toString('base64'), rawBase64: cv.imencode('.jpg', rawFrameImage).toString('base64'), };
+            const outputImage = cv.imencode('.png', rawFrameImage);
+            return { isDetectedFace: true, image: outputImage.toString('base64'), rawBase64: cv.imencode('.png', rawFrameImage).toString('base64'), };
         } else if (numDetections.length > 1) {
             for (let object of objects) {
                 cv.drawDetection(rawFrameImage, object);
             }
-            const outputImage = cv.imencode('.jpg', rawFrameImage);
+            const outputImage = cv.imencode('.png', rawFrameImage);
             return { isDetectedMultipleFace: true, image: outputImage.toString('base64') };
         } else {
-            return { isDetectedFace: false, image: cv.imencode('.jpg', rawFrameImage).toString('base64') };
+            return { isDetectedFace: false, image: cv.imencode('.png', rawFrameImage).toString('base64') };
         }
 
     }
