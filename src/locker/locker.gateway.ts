@@ -11,23 +11,23 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as io from 'socket.io-client';
 import { Socket } from 'socket.io-client';
 import { Locker } from 'src/entities/locker.entity';
-import { BluetoothEquipmentScanningService } from 'src/bluetooth-equipment-scanning/bluetooth-equipment-scanning.service';
 import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
 import { StreamAndRecordVideoService } from 'src/stream-and-record-video/stream-and-record-video.service';
 @WebSocketGateway({ cors: true })
 @Injectable()
 export class LockerGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   private logger: Logger = new Logger('LockerGateway');
   @WebSocketServer()
   server: Server;
   private socket: Socket;
   private locker: Locker;
-  constructor(private readonly lockerService: LockerService, 
-    private readonly bluetoothEquipmentScanningService: BluetoothEquipmentScanningService,
+  constructor(
+    private readonly lockerService: LockerService,
     private readonly streamAndRecordVideoService: StreamAndRecordVideoService,
-    ) {
+  ) {
     this.socket = io(
       `${process.env.SOCKET_IO_HOST}:${process.env.SOCKET_IO_PORT}/${process.env.SOCKET_IO_LOCKER_NAME_SPACE}`,
     );
@@ -69,7 +69,7 @@ export class LockerGateway
 
   async onLockerCommand(data: any) {
     console.log('->onLockerCommand:', data);
-    if(data.command == 'lockerUpdate'){
+    if (data.command == 'lockerUpdate') {
       const updatedLocker = data.data;
       const locker = await this.lockerService.updateLocker({
         id: updatedLocker.locker_id,
@@ -79,36 +79,31 @@ export class LockerGateway
         status: updatedLocker.status,
       } as Locker);
       this.server.emit('locker_updated', locker);
-    } else if(data.command == 'addEquipment') {
-      try{
-        const scanPromise = this.bluetoothEquipmentScanningService.scan();
-        const objectDetectPromise = this.detectObject();
-        const promiseResults = await Promise.all([scanPromise,objectDetectPromise]);
-        console.log('->promiseResults.data:', promiseResults[1]);
-        this.socket.emit(`locker/addEquipment/response`,{id: this.locker.id, data:promiseResults[0]});
-
-      }catch(error) {
-        console.error('Error:', error);
-      }
-    }
-    
-  }
-
-  async detectObject(): Promise<any>{
-    const objectDetectCameraMap = [0];
-    const detectResults = [];
-    await this.lockerService.setAllLightStatus(1);
-    for(const cameraNo of objectDetectCameraMap) {
-      const frame = await this.streamAndRecordVideoService.getFrame(cameraNo);
-     const detectResult = await axios.post(`${process.env.OBJECT_DETECTION_URL}:${process.env.OBJECT_DETECTION_PORT}/${process.env.OBJECT_DETECTION_DETECT_PATH}`,
+    } else if (data.command == 'addEquipment') {
+      try {
+        this.streamAndRecordVideoService.releaseCamera(0);
+        this.streamAndRecordVideoService.releaseCamera(2);
+        this.streamAndRecordVideoService.releaseCamera(3);
+        const detectResult = await axios.post(
+          `${process.env.OBJECT_DETECTION_URL}:${process.env.OBJECT_DETECTION_PORT}/${process.env.OBJECT_DETECTION_DETECT_PATH}`,
           {
             uuid: uuidv4(),
-            image: frame,
-          }
+          },
         );
-    detectResults.push(detectResult);
+        this.socket.emit(`locker/addEquipment/response`, {
+          isSucceed: true,
+          message: 'Succeed',
+          id: this.locker.id,
+          data: detectResult.data,
+        });
+      } catch (error) {
+        console.error('Error:', error);
+        this.socket.emit(`locker/addEquipment/response`, {
+          isSucceed: false,
+          message: 'Internal Server Error',
+          id: this.locker.id,
+        });
+      }
     }
-    await this.lockerService.setAllLightStatus(0);
-    return detectResults;
   }
 }

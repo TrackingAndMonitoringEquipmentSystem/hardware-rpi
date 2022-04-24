@@ -14,6 +14,7 @@ export class StreamAndRecordVideoService {
     }
     const frame = await this.captures[camera].readAsync();
     const image = cv.imencode('.jpg', frame).toString('base64');
+
     return image;
   }
 
@@ -22,7 +23,6 @@ export class StreamAndRecordVideoService {
       this.captures[camera] = new cv.VideoCapture(this.cameraMap[camera]);
     }
     const frame = await this.captures[camera].readAsync();
-
     return frame;
   }
 
@@ -32,7 +32,9 @@ export class StreamAndRecordVideoService {
   }
 
   releaseCamera(camera: number): void {
-    this.captures[camera].release();
-    this.captures[camera] = null;
+    if (this.captures[camera]) {
+      this.captures[camera].release();
+      this.captures[camera] = null;
+    }
   }
 }
