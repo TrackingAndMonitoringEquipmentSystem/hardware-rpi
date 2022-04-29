@@ -10,10 +10,4 @@ export class LockerController {
   async getLocker(): Promise<ResponseDto> {
     return getResponse('00', await this.lockerService.getLocker());
   }
-
-  @Get('/detect-object')
-  async getDetect(): Promise<any> {
-    const detected = await this.lockerService.detectObject();
-    return detected;
-  }
 }

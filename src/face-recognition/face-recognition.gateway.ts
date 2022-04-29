@@ -1,5 +1,12 @@
 import { Logger } from '@nestjs/common';
-import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import {
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  OnGatewayInit,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
+} from '@nestjs/websockets';
 import { StreamAndRecordVideoService } from 'src/stream-and-record-video/stream-and-record-video.service';
 import { FaceRecognitionService } from './face-recognition.service';
 import { Server } from 'socket.io';
@@ -7,7 +14,9 @@ import axios from 'axios';
 import { LockerService } from 'src/locker/locker.service';
 
 @WebSocketGateway({ cors: true })
-export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class FaceRecognitionGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   private logger: Logger = new Logger('FaceRecognitionGateway');
   private intervalHandler: NodeJS.Timeout;
   private isRunning = false;
@@ -17,9 +26,7 @@ export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnectio
     private readonly faceRecognitionService: FaceRecognitionService,
     private streamAndRecordVideoService: StreamAndRecordVideoService,
     private lockerService: LockerService,
-  ) {
-
-  }
+  ) {}
   afterInit(server: any) {
     this.logger.log('initialized');
   }
@@ -45,19 +52,25 @@ export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnectio
 
   async emitFaceRecognitionResult(): Promise<void> {
     const result = await this.faceRecognitionService.detectFace();
-    this.server.emit('faceRecognitionResult', result)
+    this.server.emit('faceRecognitionResult', result);
     if (result.isDetectedFace) {
+      this.isRunning = false;
       this.onStopFaceRecognition();
-      const faceRecogResult = await axios.post(`${process.env.BACKEND_URL}/${process.env.FACE_RECOGNITION_PATH}/${process.env.FACE_RECOGNITION_PATH_VALIDATE_FACE_ID}`,
+      const faceRecogResult = await axios.post(
+        `${process.env.BACKEND_URL}/${process.env.FACE_RECOGNITION_PATH}/${process.env.FACE_RECOGNITION_PATH_VALIDATE_FACE_ID}`,
         {
           base64File: result.rawBase64,
-          lockerId: (await (this.lockerService.getLocker())).id,
-        });
+          lockerId: (await this.lockerService.getLocker()).id,
+        },
+      );
       console.log('->faceRecogResult.data:', faceRecogResult.data);
-      this.server.emit('faceRecognitionResult', faceRecogResult.data)
+      this.server.emit('faceRecognitionResult', faceRecogResult.data);
     }
     if (this.isRunning) {
-      this.intervalHandler = setTimeout(this.emitFaceRecognitionResult.bind(this), 1000 / Number(process.env.FACE_RECOG_FPS));
+      this.intervalHandler = setTimeout(
+        this.emitFaceRecognitionResult.bind(this),
+        1000 / Number(process.env.FACE_RECOG_FPS),
+      );
     }
   }
 
@@ -67,6 +80,8 @@ export class FaceRecognitionGateway implements OnGatewayInit, OnGatewayConnectio
     if (this.intervalHandler) {
       clearTimeout(this.intervalHandler);
     }
-    this.streamAndRecordVideoService.releaseCamera(Number(process.env.FACE_RECOG_CAM));
+    this.streamAndRecordVideoService.releaseCamera(
+      Number(process.env.FACE_RECOG_CAM),
+    );
   }
 }
