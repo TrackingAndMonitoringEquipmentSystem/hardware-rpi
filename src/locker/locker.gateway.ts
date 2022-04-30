@@ -16,6 +16,7 @@ import { Locker } from 'src/entities/locker.entity';
 import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
 import { StreamAndRecordVideoService } from 'src/stream-and-record-video/stream-and-record-video.service';
+import { MacAddress } from 'src/entities/mac-address.entity';
 @WebSocketGateway({ cors: true })
 @Injectable()
 export class LockerGateway
@@ -128,6 +129,14 @@ export class LockerGateway
             macAddresses: data.data.macAddresses,
           },
         );
+        await this.lockerService.saveMacAddresses(
+          data.data.macAddresses.map(
+            (macAddress) =>
+              ({
+                macAddress,
+              } as MacAddress),
+          ),
+        );
       } catch (error) {
         console.log('->error:', error);
       }
@@ -159,13 +168,111 @@ export class LockerGateway
         `${process.env.OBJECT_DETECTION_URL}:${process.env.OBJECT_DETECTION_PORT}/${process.env.OBJECT_DETECTION_RECOGNITION_PATH}`,
       );
       this.lockerService.setAllLightStatus(0);
-      console.log('->borrowResult.data:', borrowResult.data);
+      const macAddresses = await this.lockerService.getAllMacAddresses();
+      const borrowMacAddresses = macAddresses.filter(
+        (macAddress) => !borrowResult.data.includes(macAddress.macAddress),
+      );
+
+      await this.lockerService.deleteMacAdrresses(
+        macAddresses.map((e) => e.id),
+      );
+      try {
+        const saveBorrowResult = await axios.post(
+          `${process.env.BACKEND_URL}/${process.env.LOCKER_PATH_BORROW}`,
+          {
+            userId: data,
+            tag_ids: macAddresses.map((e) => e.macAddress),
+          },
+        );
+        console.log('->saveBorrowResult:', saveBorrowResult.data);
+        await axios.post(
+          `${process.env.BACKEND_URL}/${process.env.USER_PATH}/${process.env.USER_PATH_SEND_NOTI}`,
+          {
+            userId: data,
+            payload: {
+              notification: {
+                title: 'Hello World',
+                body: 'This is notification',
+              },
+              data: {
+                type: 'borrow',
+                id: `${saveBorrowResult.data.data.id}`,
+              },
+            },
+          },
+        );
+      } catch (error) {
+        console.log('->saveBorrowResult error:', error);
+      }
     } catch (error) {
       this.lockerService.setAllLightStatus(0);
+
       console.error('->error.data', error.data);
     }
   }
 
   @SubscribeMessage('return')
-  async onReturn(userId): Promise<void> {}
+  async onReturn(@MessageBody() data: any): Promise<void> {
+    console.log('->data:', data);
+    try {
+      const groupBorrow = await axios.get(
+        `${process.env.BACKEND_URL}/${process.env.GROUP_BORROW_PATH}/${process.env.GROUP_BORROW_PATH_VIEW_GROUP}/${data}`,
+      );
+      const borrowMacAddresses = groupBorrow.data.data[0].borrowReturns.map(
+        (borrowReturn) => borrowReturn.equipment.tag_id,
+      );
+
+      await this.lockerService.setAllLightStatus(1);
+      const returnResults = await axios.get(
+        `${process.env.OBJECT_DETECTION_URL}:${process.env.OBJECT_DETECTION_PORT}/${process.env.OBJECT_DETECTION_RECOGNITION_PATH}`,
+      );
+      this.lockerService.setAllLightStatus(0);
+      console.log('->returnResults.data:', returnResults.data);
+      const macAddresses = await this.lockerService.getAllMacAddresses();
+      const returnMacAddresses = returnResults.data.filter(
+        (returnResult) =>
+          !macAddresses.find(
+            (macAddress) => macAddress.macAddress === returnResult,
+          ),
+      );
+      console.log('->returnMacAddresses:', returnMacAddresses);
+      const detectedReturnMacAddresses = returnMacAddresses.filter(
+        (returnMacAddress) => borrowMacAddresses.includes(returnMacAddress),
+      );
+      console.log('->detectedReturnMacAddresses:', detectedReturnMacAddresses);
+      await this.lockerService.saveMacAddresses(
+        detectedReturnMacAddresses.map(
+          (e) => ({ macAddress: e } as MacAddress),
+        ),
+      );
+      try {
+        const saveReturnResult = await axios.patch(
+          `${process.env.BACKEND_URL}/${process.env.BORROW_PATH}/${process.env.BORROW_PATH_RETURN}/${groupBorrow.data.data[0].id}`,
+        );
+        console.log('->saveReturnResult:', saveReturnResult.data);
+        await axios.post(
+          `${process.env.BACKEND_URL}/${process.env.USER_PATH}/${process.env.USER_PATH_SEND_NOTI}`,
+          {
+            userId: data,
+            payload: {
+              notification: {
+                title: 'Hello World',
+                body: 'This is notification',
+              },
+              data: {
+                type: 'borrow',
+                id: `${groupBorrow.data.data[0].id}`,
+              },
+            },
+          },
+        );
+      } catch (error) {
+        console.log('->saveBorrowResult error:', error);
+      }
+    } catch (error) {
+      this.lockerService.setAllLightStatus(0);
+
+      console.error('->error.data', error.data);
+    }
+  }
 }

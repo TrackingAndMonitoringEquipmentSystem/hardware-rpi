@@ -4,6 +4,7 @@ import { Locker } from 'src/entities/locker.entity';
 import { Repository } from 'typeorm/repository/Repository';
 import axios from 'axios';
 import { BinaryValue, Gpio } from 'onoff';
+import { MacAddress } from 'src/entities/mac-address.entity';
 @Injectable()
 export class LockerService {
   private logger = new Logger('LockerService');
@@ -34,6 +35,8 @@ export class LockerService {
   constructor(
     @InjectRepository(Locker)
     private lockerRepository: Repository<Locker>,
+    @InjectRepository(MacAddress)
+    private macAddressRepository: Repository<MacAddress>,
   ) {
     this.initialGpio();
     this.initialLocker();
@@ -104,5 +107,17 @@ export class LockerService {
         this.door4.write(state);
         break;
     }
+  }
+
+  async saveMacAddresses(macAddress: MacAddress[]) {
+    return await this.macAddressRepository.save(macAddress);
+  }
+
+  async getAllMacAddresses(): Promise<MacAddress[]> {
+    return await this.macAddressRepository.find();
+  }
+
+  async deleteMacAdrresses(macAddressIds: number[]): Promise<void> {
+    await this.macAddressRepository.delete(macAddressIds);
   }
 }
