@@ -140,6 +140,9 @@ export class LockerGateway
       } catch (error) {
         console.log('->error:', error);
       }
+    } else if (data.command == 'toggleLocker') {
+      console.log('->toggleLocker');
+      this.server.emit('toggle_locker', data.data);
     }
   }
 
@@ -181,7 +184,7 @@ export class LockerGateway
           `${process.env.BACKEND_URL}/${process.env.LOCKER_PATH_BORROW}`,
           {
             userId: data,
-            tag_ids: macAddresses.map((e) => e.macAddress),
+            tag_ids: borrowMacAddresses.map((e) => e.macAddress),
           },
         );
         console.log('->saveBorrowResult:', saveBorrowResult.data);
