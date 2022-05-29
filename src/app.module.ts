@@ -9,8 +9,8 @@ import { FaceRecognitionModule } from './face-recognition/face-recognition.modul
 import { LockerModule } from './locker/locker.module';
 @Module({
   imports: [
-    StreamAndRecordVideoModule,
     ConfigModule.forRoot(),
+    LockerModule,
     TypeOrmModule.forRoot({
       type: 'mysql',
       host: process.env.DB_HOST,
@@ -23,7 +23,7 @@ import { LockerModule } from './locker/locker.module';
       logging: true,
     }),
     FaceRecognitionModule,
-    LockerModule,
+    StreamAndRecordVideoModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -12,13 +12,13 @@ export class StreamAndRecordVideoGateway {
   constructor(
     private readonly streamAndRecordVideoService: StreamAndRecordVideoService,
   ) {
-    // this.socket = io(
-    //   `${process.env.SOCKET_IO_HOST}:${process.env.SOCKET_IO_PORT}/${process.env.SOCKET_IO_NAME_SPACE}`,
-    // );
-    // this.socket.on('connect', this.onConnectedHandler.bind(this));
-    // this.socket.on('disconnect', this.onDisconnectedHandler.bind(this));
-    // this.socket.on('connect_error', this.onConnectErrorHandler.bind(this));
-    // this.subscribeToEvents(this.socket);
+    this.socket = io(
+      `${process.env.SOCKET_IO_HOST}:${process.env.SOCKET_IO_PORT}/${process.env.SOCKET_IO_VIDEO_NAME_SPACE}`,
+    );
+    this.socket.on('connect', this.onConnectedHandler.bind(this));
+    this.socket.on('disconnect', this.onDisconnectedHandler.bind(this));
+    this.socket.on('connect_error', this.onConnectErrorHandler.bind(this));
+    this.subscribeToEvents(this.socket);
   }
 
   onConnectedHandler(): void {
@@ -67,5 +67,4 @@ export class StreamAndRecordVideoGateway {
     };
     this.socket.emit(`live`, emitData);
   }
-
 }

@@ -17,6 +17,8 @@ import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
 import { StreamAndRecordVideoService } from 'src/stream-and-record-video/stream-and-record-video.service';
 import { MacAddress } from 'src/entities/mac-address.entity';
+import * as cv from 'opencv4nodejs';
+
 @WebSocketGateway({ cors: true })
 @Injectable()
 export class LockerGateway
@@ -27,6 +29,8 @@ export class LockerGateway
   server: Server;
   private socket: Socket;
   private locker: Locker;
+  private isLivings: boolean[] = [];
+
   constructor(
     private readonly lockerService: LockerService,
     private readonly streamAndRecordVideoService: StreamAndRecordVideoService,
@@ -45,12 +49,9 @@ export class LockerGateway
   handleConnection(client: any, ...args: any[]) {
     this.logger.log('Client connected: ');
   }
-  handleDisconnect(client: any) {
+  async handleDisconnect(client: any): Promise<void> {
     this.logger.log('Client disconnected: ');
     this.logger.log('->backend socket io connected');
-    this.socket.emit('join', {
-      room: process.env.LOCKER_UID,
-    });
   }
 
   onConnectedHandler(): void {
@@ -66,8 +67,22 @@ export class LockerGateway
   }
 
   async subscribeToEvents(socket: Socket): Promise<void> {
-    this.locker = await this.lockerService.getLocker();
-    socket.on(`locker/${this.locker.id}`, this.onLockerCommand.bind(this));
+    try {
+      this.locker = await this.lockerService.getLocker();
+      this.isLivings = Array(process.env.CAMERA_MAP.split(',').length).fill(
+        false,
+      );
+      socket.on(`locker/${this.locker.id}`, this.onLockerCommand.bind(this));
+    } catch (error) {
+      console.log('->error:', error);
+      setTimeout(async () => {
+        this.locker = await this.lockerService.getLocker();
+        this.isLivings = Array(process.env.CAMERA_MAP.split(',').length).fill(
+          false,
+        );
+        socket.on(`locker/${this.locker.id}`, this.onLockerCommand.bind(this));
+      }, 2000);
+    }
   }
 
   async onLockerCommand(data: any) {
@@ -84,7 +99,7 @@ export class LockerGateway
       this.server.emit('locker_updated', locker);
     } else if (data.command == 'addEquipment') {
       try {
-        this.streamAndRecordVideoService.releaseCamera(0);
+        this.streamAndRecordVideoService.releaseCamera(1);
         this.streamAndRecordVideoService.releaseCamera(2);
         this.streamAndRecordVideoService.releaseCamera(3);
         this.streamAndRecordVideoService.releaseCamera(4);
@@ -143,7 +158,54 @@ export class LockerGateway
     } else if (data.command == 'toggleLocker') {
       console.log('->toggleLocker');
       this.server.emit('toggle_locker', data.data);
+      if (!data.data.state) {
+        this.lockerService.setAllLightStatus(0);
+        this.lockerService.setDoorState(1, 0);
+        this.lockerService.setDoorState(2, 0);
+        this.lockerService.setDoorState(3, 0);
+        this.lockerService.setDoorState(4, 0);
+      }
+    } else if (data.command == 'toggleLive') {
+      if (data.data.state) {
+        this.lockerService.setAllLightStatus(1);
+        this.isLivings[data.data.cameraChannel] = true;
+        this.emitLive(data.data.cameraChannel);
+      } else {
+        this.isLivings[data.data.cameraChannel] = false;
+        if (this.isLivings.every((isLiving) => isLiving === false)) {
+          this.lockerService.setAllLightStatus(0);
+        }
+      }
     }
+  }
+
+  async emitLive(cameraChannel: number): Promise<void> {
+    const liveFrame = await this.streamAndRecordVideoService.getFrameImage(
+      cameraChannel,
+    );
+    const base64Image = cv
+      .imencode('.jpg', liveFrame, [cv.IMWRITE_JPEG_QUALITY, 30])
+      .toString('base64');
+
+    this.socket.emit('locker/live/response', {
+      lockerId: this.locker.id,
+      cameraChannel,
+      base64Image,
+    });
+
+    if (this.isLivings[cameraChannel]) {
+      setTimeout(
+        () => this.emitLive(cameraChannel),
+        1000 / Number(process.env.FPS),
+      );
+    } else {
+      this.stopLive(cameraChannel);
+    }
+  }
+
+  stopLive(cameraChannel: number) {
+    this.isLivings[cameraChannel] = false;
+    this.streamAndRecordVideoService.releaseCamera(cameraChannel);
   }
 
   @SubscribeMessage('unlock')
@@ -152,6 +214,7 @@ export class LockerGateway
     this.lockerService.setDoorState(2, 1);
     this.lockerService.setDoorState(3, 1);
     this.lockerService.setDoorState(4, 1);
+    this.lockerService.setAllLightStatus(1);
   }
 
   @SubscribeMessage('lock')
@@ -160,6 +223,7 @@ export class LockerGateway
     this.lockerService.setDoorState(2, 0);
     this.lockerService.setDoorState(3, 0);
     this.lockerService.setDoorState(4, 0);
+    this.lockerService.setAllLightStatus(0);
   }
 
   @SubscribeMessage('borrow')
@@ -194,8 +258,8 @@ export class LockerGateway
             userId: data,
             payload: {
               notification: {
-                title: 'Hello World',
-                body: 'This is notification',
+                title: 'รายการยืมอุปกรณ์',
+                body: 'กรุณาตรวจสอบรายการยืมอุปกรณ์',
               },
               data: {
                 type: 'borrow',
@@ -221,10 +285,12 @@ export class LockerGateway
       const groupBorrow = await axios.get(
         `${process.env.BACKEND_URL}/${process.env.GROUP_BORROW_PATH}/${process.env.GROUP_BORROW_PATH_VIEW_GROUP}/${data}`,
       );
+
+      console.log('->groupBorrow:', groupBorrow);
       const borrowMacAddresses = groupBorrow.data.data[0].borrowReturns.map(
         (borrowReturn) => borrowReturn.equipment.tag_id,
       );
-
+      console.log('->borrowMacAddresses:', borrowMacAddresses);
       await this.lockerService.setAllLightStatus(1);
       const returnResults = await axios.get(
         `${process.env.OBJECT_DETECTION_URL}:${process.env.OBJECT_DETECTION_PORT}/${process.env.OBJECT_DETECTION_RECOGNITION_PATH}`,
@@ -259,8 +325,8 @@ export class LockerGateway
             userId: data,
             payload: {
               notification: {
-                title: 'Hello World',
-                body: 'This is notification',
+                title: 'รายการคืนอุปกรณ์',
+                body: 'กรุณาตรวจสอบรายการคืนอุปกรณ์',
               },
               data: {
                 type: 'borrow',

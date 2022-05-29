@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import * as cv from 'opencv4nodejs';
+import * as fs from 'fs';
 @Injectable()
 export class StreamAndRecordVideoService {
   private captures: Record<number, cv.VideoCapture> = {};
   private readonly cameraMap: string[];
   constructor() {
-    this.cameraMap = process.env.CAMERA_MAP.split(',');
+    this.cameraMap = process.env.CAMERA_MAP.split(',')
+      .filter((e) => fs.existsSync(e))
+      .map((e) => fs.realpathSync(e));
   }
 
   async getFrame(camera: number): Promise<string> {
